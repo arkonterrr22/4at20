@@ -1,0 +1,50 @@
+services:
+  authservice:
+    build:
+      context: ./authService
+      dockerfile: Dockerfile.auth.dev
+    container_name: authService
+    volumes:
+      - ./authService:/app
+      - /app/tmp
+    ports: 
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - POSTGRES_USER=arkonter
+      - POSTGRES_PASSWORD=arkonter
+      - POSTGRES_HOST=authdb
+      - POSTGRES_DB=db
+      - POSTGRES_URL=postgresql://arkonter:arkonter@authdb:6000/db?sslmode=disable
+    networks:
+      - network
+    depends_on:
+      authdb:
+        condition: service_healthy  
+
+  authdb:
+    image: postgres:18-alpine
+    container_name: authDB
+    restart: unless-stopped
+    command: postgres -p 6000
+    environment:
+      POSTGRES_USER: arkonter
+      POSTGRES_PASSWORD: arkonter
+      POSTGRES_DB: db
+    ports: 
+    - "6000:6000"
+    volumes:
+    - authdb:/var/lib/postgresql/data:rw
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -p 6000 -d db -U arkonter"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - network
+
+
+networks:
+  network:
+volumes:
+  authdb:
