@@ -17,10 +17,6 @@ type Server struct {
 func New(database *db.Database) *Server {
 	router := gin.Default()
 
-	// Middleware
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
-
 	s := &Server{
 		db:     database,
 		router: router,
@@ -42,15 +38,16 @@ func (s *Server) setupRoutes() {
 	auth := s.router.Group("/auth")
 	{
 		auth.GET("/hi", Hi(s.db))
-		// Auth
-		// auth.POST("/register", Register(s.db))
-		// auth.POST("/login", Login(s.db))
-
-		// Users
-		// v1.GET("/users/:id", handlers.GetUser(s.db))
-		// v1.DELETE("/users/:id", handlers.DeleteUser(s.db))
-		// v1.GET("/users", handlers.ListUsers(s.db))
+		auth.POST("/register", Register(s.db))
+		auth.POST("/login", Login(s.db))
 	}
+	users := s.router.Group("/users")
+	{
+		users.GET("/:id", GetUser(s.db))
+		users.DELETE("/:id", DeleteUser(s.db))
+		users.GET("/", ListUsers(s.db))
+	}
+
 }
 
 func (s *Server) Start(addr string) error {

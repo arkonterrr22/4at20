@@ -1,12 +1,12 @@
 package server
 
 import (
+	"authService/db"
 	"net/http"
 	"time"
 
-	"authService/db"
-
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -21,8 +21,9 @@ func Hi(db *db.Database) gin.HandlerFunc {
 func Register(db *db.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Username string `json:"username" binding:"required,min=3,max=50"`
-			Password string `json:"password" binding:"required,min=6"`
+			Username string `json:"username" binding:"required,max=50"`
+			Login    string `json:"login" binding:"required,max=255"`
+			Password string `json:"password" binding:"required,max=255"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -30,11 +31,10 @@ func Register(db *db.Database) gin.HandlerFunc {
 			return
 		}
 
-		// Проверяем существование пользователя
 		var exists bool
 		err := db.Pool.QueryRow(c.Request.Context(),
-			"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
-			req.Username,
+			"SELECT EXISTS(SELECT 1 FROM auth WHERE login = $1 AND password = $2)",
+			req.Login, req.Password,
 		).Scan(&exists)
 
 		if err != nil {
@@ -47,7 +47,6 @@ func Register(db *db.Database) gin.HandlerFunc {
 			return
 		}
 
-		// Создаем пользователя
 		userID := uuid.New()
 		tx, err := db.Pool.Begin(c.Request.Context())
 		if err != nil {
@@ -56,27 +55,22 @@ func Register(db *db.Database) gin.HandlerFunc {
 		}
 		defer tx.Rollback(c.Request.Context())
 
-		// 1. Вставляем пользователя
 		_, err = tx.Exec(c.Request.Context(),
 			"INSERT INTO users (id, username) VALUES ($1, $2)",
 			userID, req.Username,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при создании пользователя"})
 			return
 		}
-
-		// 2. Сохраняем пароль (TODO: хешировать!)
 		_, err = tx.Exec(c.Request.Context(),
-			"INSERT INTO auth (user_id, password_hash) VALUES ($1, $2)",
-			userID, req.Password, // ВРЕМЕННО - хешировать в продакшене!
+			"INSERT INTO auth (user_id, login, password) VALUES ($1, $2, $3)",
+			userID, req.Login, req.Password,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save password"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при сохранении пароля"})
 			return
 		}
-
-		// 3. Добавляем в группу "Все пользователи" если есть
 		_, _ = tx.Exec(c.Request.Context(),
 			`INSERT INTO user_group (user_id, group_id) 
 			 VALUES ($1, '00000000-0000-0000-0000-000000000000')
@@ -85,12 +79,12 @@ func Register(db *db.Database) gin.HandlerFunc {
 		)
 
 		if err := tx.Commit(c.Request.Context()); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Commit failed"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Коммит не осуществлён"})
 			return
 		}
 
 		c.JSON(http.StatusCreated, gin.H{
-			"message":  "User registered successfully",
+			"message":  "Регистрация прошла успешно",
 			"user_id":  userID.String(),
 			"username": req.Username,
 		})
@@ -100,7 +94,7 @@ func Register(db *db.Database) gin.HandlerFunc {
 func Login(db *db.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Username string `json:"username" binding:"required"`
+			Login    string `json:"login" binding:"required"`
 			Password string `json:"password" binding:"required"`
 		}
 
@@ -110,34 +104,69 @@ func Login(db *db.Database) gin.HandlerFunc {
 		}
 
 		var userID uuid.UUID
-		var passwordHash string
+		var password string
+		var username string
 		err := db.Pool.QueryRow(c.Request.Context(),
-			`SELECT u.id, a.password_hash 
-			 FROM users u
-			 JOIN auth a ON a.user_id = u.id
-			 WHERE u.username = $1`,
-			req.Username,
-		).Scan(&userID, &passwordHash)
-
+			`SELECT a.user_id, a.password, u.username
+			 FROM auth a
+			 JOIN users u ON a.user_id = u.id
+			 WHERE a.login = $1`,
+			req.Login,
+		).Scan(&userID, &password, &username)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный логин"})
 			return
 		}
 
-		// TODO: Использовать bcrypt.CompareHashAndPassword()
-		if passwordHash != req.Password {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		if password != req.Password {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный пароль"})
 			return
 		}
 
-		// TODO: Генерировать JWT токен
-		token := "jwt-token-placeholder-" + userID.String()
+		rows, err := db.Pool.Query(c.Request.Context(),
+			`SELECT ug.group_id
+			 FROM user_group ug
+			 WHERE ug.user_id = $1`,
+			userID,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при получении групп"})
+			return
+		}
+		defer rows.Close()
+		var groups []uuid.UUID
+		for rows.Next() {
+			var groupID uuid.UUID
+			if err := rows.Scan(&groupID); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка обработки групп"})
+				return
+			}
+			groups = append(groups, groupID)
+		}
+
+		if err = rows.Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при чтении групп"})
+			return
+		}
+
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"user_id":  userID.String(),
+			"username": username,
+			"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		})
+
+		tokenString, err := token.SignedString([]byte("super-secret-key"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка генерации токена"})
+			return
+		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"message":  "Login successful",
 			"user_id":  userID.String(),
-			"username": req.Username,
-			"token":    token,
+			"username": username,
+			"groups":   groups,
+			"token":    tokenString,
 		})
 	}
 }
@@ -180,10 +209,8 @@ func DeleteUser(db *db.Database) gin.HandlerFunc {
 			return
 		}
 
-		// TODO: Отправить событие в RabbitMQ о удалении пользователя
-
 		c.JSON(http.StatusOK, gin.H{
-			"message": "User deleted successfully",
+			"message": "Пользователь удалён",
 			"user_id": userID,
 		})
 	}

@@ -6,7 +6,6 @@ services:
     container_name: authService
     volumes:
       - ./authService:/app
-      - /app/tmp
     ports: 
       - "8080:8080"
     environment:
