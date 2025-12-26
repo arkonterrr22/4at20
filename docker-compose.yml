@@ -6,6 +6,7 @@ services:
     container_name: authService
     volumes:
       - ./authService:/app
+      - ./authService/tmp:/app/tmp
     ports: 
       - "8080:8080"
     environment:
@@ -42,8 +43,52 @@ services:
     networks:
       - network
 
+  chatservice:
+    build:
+      context: ./chatService
+      dockerfile: Dockerfile.chat.dev
+    container_name: chatService
+    volumes:
+      - ./chatService:/app
+      - ./chatService/tmp:/app/tmp
+    ports: 
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+      - POSTGRES_USER=arkonter
+      - POSTGRES_PASSWORD=arkonter
+      - POSTGRES_HOST=chatdb
+      - POSTGRES_DB=db
+      - POSTGRES_URL=postgresql://arkonter:arkonter@chatdb:6001/db?sslmode=disable
+    networks:
+      - network
+    depends_on:
+      chatdb:
+        condition: service_healthy  
+
+  chatdb:
+    image: postgres:18-alpine
+    container_name: chatDB
+    restart: unless-stopped
+    command: postgres -p 6001
+    environment:
+      POSTGRES_USER: arkonter
+      POSTGRES_PASSWORD: arkonter
+      POSTGRES_DB: db
+    ports: 
+    - "6001:6001"
+    volumes:
+    - chatdb:/var/lib/postgresql/data:rw
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -p 6001 -d db -U arkonter"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - network
 
 networks:
   network:
 volumes:
   authdb:
+  chatdb:

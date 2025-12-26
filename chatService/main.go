@@ -23,7 +23,6 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 	log.Println("Database migrations completed successfully")
-	log.Println("Database migrations completed successfully")
 	srv := server.New(database, jwtSecret)
 	port := os.Getenv("SERVER_PORT")
 	log.Printf("Auth Service starting on :%s", port)

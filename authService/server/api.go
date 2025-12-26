@@ -10,16 +10,18 @@ import (
 )
 
 type Server struct {
-	db     *db.Database
-	router *gin.Engine
+	db        *db.Database
+	router    *gin.Engine
+	jwtSecret string
 }
 
-func New(database *db.Database) *Server {
+func New(database *db.Database, jwtSecret string) *Server {
 	router := gin.Default()
 
 	s := &Server{
-		db:     database,
-		router: router,
+		db:        database,
+		router:    router,
+		jwtSecret: jwtSecret,
 	}
 
 	s.setupRoutes()
@@ -37,15 +39,10 @@ func (s *Server) setupRoutes() {
 
 	auth := s.router.Group("/auth")
 	{
-		auth.GET("/hi", Hi(s.db))
 		auth.POST("/register", Register(s.db))
-		auth.POST("/login", Login(s.db))
-	}
-	users := s.router.Group("/users")
-	{
-		users.GET("/:id", GetUser(s.db))
-		users.DELETE("/:id", DeleteUser(s.db))
-		users.GET("/", ListUsers(s.db))
+		auth.POST("/login", Login(s.db, s.jwtSecret))
+		auth.GET("user/:id", GetUser(s.db))
+		auth.DELETE("user/:id", DeleteUser(s.db))
 	}
 
 }

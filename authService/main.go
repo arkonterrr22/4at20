@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	jwtSecret := "super-secret-pass"
 	connStr := os.Getenv("POSTGRES_URL")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -24,7 +25,7 @@ func main() {
 	}
 
 	log.Println("Database migrations completed successfully")
-	srv := server.New(database)
+	srv := server.New(database, jwtSecret)
 	port := os.Getenv("SERVER_PORT")
 	log.Printf("Auth Service starting on :%s", port)
 	if err := srv.Start(":" + port); err != nil {

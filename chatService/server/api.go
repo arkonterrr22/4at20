@@ -38,39 +38,25 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		Groups   []string `json:"groups"`
 		jwt.RegisteredClaims
 	}
+
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
 			return
 		}
+
 		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header format must be Bearer {token}"})
-			c.Abort()
-			return
-		}
-
-		tokenString := parts[1]
-
 		claims := &Claims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		token, err := jwt.ParseWithClaims(parts[len(parts)-1], claims, func(token *jwt.Token) (interface{}, error) {
+			if token.Method != jwt.SigningMethodHS256 {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 			return []byte(jwtSecret), nil
 		})
 
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token", "details": err.Error()})
-			c.Abort()
-			return
-		}
-
-		if !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
+		if err != nil || !token.Valid {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
 
@@ -87,7 +73,7 @@ func (s *Server) setupRoutes() {
 	s.router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
-			"service": "auth",
+			"service": "chat",
 			"time":    time.Now().UTC(),
 		})
 	})
@@ -97,12 +83,16 @@ func (s *Server) setupRoutes() {
 	{
 		chat.GET("/list", ListChats(s.db))
 		chat.POST("/create", CreateChat(s.db))
+		chat.GET("/:chatid/members/", GetMembers(s.db))
+		chat.POST("/:chatid/members/add", AddMembers(s.db))
+		chat.DELETE("/:chatid/members/remove", RemoveMembers(s.db))
+		chat.DELETE("/:chatid/remove", DeleteChat(s.db))
 		chat.GET("/:chatid/info", GetChatInfo(s.db))
-		chat.GET("/:chatid/messages", GetChatMessages(s.db))
-		chat.DELETE("/:chatid/messages", DeleteMessages(s.db))
-		chat.POST("/:chatid/messages/send", SendMesage(s.db))
-		chat.GET("/:chatid/messages/:msgid", GetMessage(s.db))
-		chat.PATCH("/:chatid/messages/:msgid", EditMessage(s.db))
+		chat.PATCH("/:chatid/edit", EditChatInfo(s.db))
+		chat.POST("/:chatid/messages/send", AddMesage(s.db))
+		chat.GET("/:chatid/messages", GetMessages(s.db))
+		chat.DELETE("/:chatid/messages/remove", DeleteMessages(s.db))
+		chat.PATCH("/:chatid/messages/edit", EditMessage(s.db))
 	}
 
 }

@@ -10,14 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-func Hi(db *db.Database) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"reply": "hi",
-		})
-	}
-}
-
 func Register(db *db.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
@@ -91,7 +83,7 @@ func Register(db *db.Database) gin.HandlerFunc {
 	}
 }
 
-func Login(db *db.Database) gin.HandlerFunc {
+func Login(db *db.Database, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Login    string `json:"login" binding:"required"`
@@ -152,13 +144,27 @@ func Login(db *db.Database) gin.HandlerFunc {
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"user_id":  userID.String(),
 			"username": username,
-			"exp":      time.Now().Add(time.Hour * 24).Unix(),
+			"groups":   groups,
+			"exp":      time.Now().Add(24 * time.Hour).Unix(),
 		})
 
-		tokenString, err := token.SignedString([]byte("super-secret-key"))
+		tokenString, err := token.SignedString([]byte(jwtSecret))
+
+		var dbtoken string
+		err = db.Pool.QueryRow(c.Request.Context(),
+			`UPDATE auth
+			SET jwt = $1
+			WHERE user_id = $2
+			RETURNING jwt`,
+			tokenString, userID,
+		).Scan(&dbtoken)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка генерации токена"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
+		}
+
+		if dbtoken != tokenString {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "dbtoken!=tokenstring"})
 		}
 
 		c.JSON(http.StatusOK, gin.H{
