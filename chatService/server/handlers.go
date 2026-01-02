@@ -4,10 +4,12 @@ import (
 	"chatService/db"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type Chat struct {
@@ -34,6 +36,7 @@ func ListChats(db *db.Database) gin.HandlerFunc {
 			FROM chats c
 			JOIN user_chat uc ON uc.chat_id = c.id
 			WHERE uc.user_id = $1
+			ORDER BY c.created_at DESC;
 		`, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -282,36 +285,82 @@ func AddMesage(db *db.Database) gin.HandlerFunc {
 func GetMessages(db *db.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		chatID := c.Param("chatid")
-		page := c.Query("page")
-		limit := c.Query("limit")
-		rows, err := db.Pool.Query(c, `
-			SELECT *
-			FROM messages m
-			WHERE m.chat_id = $1
-			ORDER BY m.created_at desc
-			LIMIT $2
-			OFFSET $3;
-		`, chatID, limit, page)
+		before := c.Query("before")
+		after := c.Query("after")
+
+		limitStr := c.DefaultQuery("limit", "20")
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil || limit <= 0 {
+			limit = 20
+		}
+
+		var rows pgx.Rows
+
+		switch {
+		case before != "" && after != "":
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "use either before or after, not both",
+			})
+			return
+
+		case before != "":
+			rows, err = db.Pool.Query(c, `
+				SELECT *
+				FROM messages
+				WHERE chat_id = $1 AND created_at < $2
+				ORDER BY created_at DESC
+				LIMIT $3
+			`, chatID, before, limit)
+
+		case after != "":
+			rows, err = db.Pool.Query(c, `
+				SELECT *
+				FROM messages
+				WHERE chat_id = $1 AND created_at > $2
+				ORDER BY created_at ASC
+				LIMIT $3
+			`, chatID, after, limit)
+
+		default:
+			rows, err = db.Pool.Query(c, `
+				SELECT *
+				FROM messages
+				WHERE chat_id = $1
+				ORDER BY created_at DESC
+				LIMIT $2
+			`, chatID, limit)
+		}
+
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error1": err.Error(),
+				"db_error": err.Error(),
 			})
 			return
 		}
 		defer rows.Close()
+
 		messages := make([]Message, 0)
 		for rows.Next() {
 			var msg Message
-			if err := rows.Scan(&msg.Id, &msg.Chat_ID, &msg.User_ID, &msg.Text, &msg.Content, &msg.Created_at); err != nil {
+			if err := rows.Scan(
+				&msg.Id,
+				&msg.Chat_ID,
+				&msg.User_ID,
+				&msg.Text,
+				&msg.Content,
+				&msg.Created_at,
+			); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
-					"error2": err.Error(),
+					"error": err.Error(),
 				})
 				return
 			}
 			messages = append(messages, msg)
 		}
 
-		c.JSON(http.StatusOK, gin.H{"messages": messages})
+		c.JSON(http.StatusOK, gin.H{
+			"messages": messages,
+		})
 	}
 }
 

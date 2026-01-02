@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Портфолио чат</title>
+    <meta name="title" content="Портфолио чат">
+    <meta name="description" content="Портфолио чат @arkonterrr">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,shrink-to-fit=no,viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-title" content="чатик arkonterrr">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="чатик arkonterrr">
+    <meta name="application-name" content="Портфолио чат @arkonterrr">
+    <script src="./scripts/jwtdecode.js"></script>
+    <script src="./scripts/auth.js"></script>
+    <link rel="stylesheet" href="./styles/style.css">
+</head>
+
+<body>
+    <div class="app">
+        <h1>
+        Регистрация
+        </h1>
+        <input id="username" placeholder="Имя пользователя">
+        <input id="login" placeholder="Логин">
+        <input id="password" placeholder="Пароль">
+        <button id="submit-btn" style="background: #426d4d;">Зарегистрироваться</button>
+        <button id="back-btn">Назад...</button>
+    </div>
+    
+    <script>
+        const usernameInput = document.getElementById("username");
+        const loginInput = document.getElementById("login");
+        const passwordInput = document.getElementById("password");
+        const submitBtn = document.getElementById("submit-btn");
+        const backBtn = document.getElementById("back-btn");
+
+        async function handleAuth(fn) {
+            try {
+                const data = await fn(
+                    usernameInput.value,
+                    loginInput.value,
+                    passwordInput.value
+                );
+
+                localStorage.setItem("token", data.token);
+                window.location.href = "/";
+            } catch (e) {
+                alert("Ошибка авторизации");
+            }
+        }
+
+        submitBtn.addEventListener("click", () =>
+            handleAuth(window.api.register)
+        );
+
+        backBtn.addEventListener("click", () =>
+            window.location.href = "./login.html"
+        );
+
+    </script>
+    <script src="./scripts/api.js" defer></script>
+</body>
+</html>

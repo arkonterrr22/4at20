@@ -222,17 +222,17 @@ func DeleteUser(db *db.Database) gin.HandlerFunc {
 	}
 }
 
-func ListUsers(db *db.Database) gin.HandlerFunc {
+func GetGroupUsers(db *db.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		limit := c.DefaultQuery("limit", "50")
-		offset := c.DefaultQuery("offset", "0")
+		groupID := c.Param("groupid")
 
 		rows, err := db.Pool.Query(c.Request.Context(),
-			`SELECT id, username, created_at 
-			 FROM users 
-			 ORDER BY created_at DESC 
-			 LIMIT $1 OFFSET $2`,
-			limit, offset,
+			`SELECT u.id, u.username, u.created_at 
+			 FROM users u
+			 LEFT JOIN user_group ug on u.id = ug.user_id
+			 WHERE ug.group_id = $1
+			 ORDER BY u.created_at DESC`,
+			groupID,
 		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})

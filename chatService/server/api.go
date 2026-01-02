@@ -78,12 +78,12 @@ func (s *Server) setupRoutes() {
 		})
 	})
 
-	chat := s.router.Group("/chat")
+	chat := s.router.Group("/")
 	chat.Use(AuthMiddleware(s.jwtSecret))
 	{
 		chat.GET("/list", ListChats(s.db))
 		chat.POST("/create", CreateChat(s.db))
-		chat.GET("/:chatid/members/", GetMembers(s.db))
+		chat.GET("/:chatid/members", GetMembers(s.db))
 		chat.POST("/:chatid/members/add", AddMembers(s.db))
 		chat.DELETE("/:chatid/members/remove", RemoveMembers(s.db))
 		chat.DELETE("/:chatid/remove", DeleteChat(s.db))

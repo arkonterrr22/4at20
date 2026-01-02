@@ -37,12 +37,13 @@ func (s *Server) setupRoutes() {
 		})
 	})
 
-	auth := s.router.Group("/auth")
+	auth := s.router.Group("/")
 	{
 		auth.POST("/register", Register(s.db))
 		auth.POST("/login", Login(s.db, s.jwtSecret))
 		auth.GET("user/:id", GetUser(s.db))
 		auth.DELETE("user/:id", DeleteUser(s.db))
+		auth.GET("/group/:groupid/users", GetGroupUsers(s.db))
 	}
 
 }

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <title>Портфолио чат</title>
+    <meta name="title" content="Портфолио чат">
+    <meta name="description" content="Портфолио чат @arkonterrr">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,shrink-to-fit=no,viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-title" content="чатик arkonterrr">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="чатик arkonterrr">
+    <meta name="application-name" content="Портфолио чат @arkonterrr">
+    <script src="./scripts/jwtdecode.js"></script>
+    <script src="./scripts/auth.js"></script>
+    <script src="./scripts/api.js"></script>
+    <link rel="stylesheet" href="./styles/style.css">
+</head>
+<body>
+    <div class="app"c style="justify-content: space-between;">
+        <div class="topbar">
+            <button title="Настройки" onclick="location.href='/settings.html'">⚙️</button>
+            <div class="search">
+                <input placeholder="Поиск" autocomplete="on" id="userSearch"/>
+                <div id="searchResults" class="dropdown"></div>
+            </div>
+        </div>
+
+        <div class="main">
+        </div>
+
+        <div class="bottom">
+            <button style="height: 80%;" onclick="location.href='/chat_creation.html'">СОЗДАТЬ ЧАТ</button>
+        </div>
+    </div>
+<script src="./scripts/elgenerator.js"></script>
+<script src="./scripts/list_chats.js" defer></script>
+<script src="./scripts/search.js" defer></script>
+</body>

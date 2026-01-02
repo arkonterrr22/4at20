@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <title>Портфолио чат</title>
+    <meta name="title" content="Портфолио чат">
+    <meta name="description" content="Портфолио чат @arkonterrr">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,shrink-to-fit=no,viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-title" content="чатик arkonterrr">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="чатик arkonterrr">
+    <meta name="application-name" content="Портфолио чат @arkonterrr">
+    <script src="./scripts/jwtdecode.js"></script>
+    <script src="./scripts/auth.js"></script>
+    <link rel="stylesheet" href="./styles/style.css">
+</head>
+<body>
+    <div class="app"c style="justify-content: space-between;">
+        <div class="topbar">
+            <button title="Назад" onclick="location.href='/'">⭠</button>
+            <h1>Настройки</h1>
+        </div>
+        <div class="main">
+        <div id="profile">
+            <h2>Профиль</h2>
+            <span id="username" class="chat-title"></span>
+        </div>
+        <div id="groups">
+            <h2>Группы</h2>
+        </div>
+        </div>
+
+        <div class="bottom">
+            <button id="logout" style="height: 80%;">ВЫЙТИ</button>
+        </div>
+    </div>
+
+<script>
+    const userName = document.querySelector("#username");
+    userName.innerText = "@ "+window.token.username;
+    const groupsEl = document.querySelector("#groups")
+    window.token.groups.forEach(user_group => {
+        const group = document.createElement("span");
+        group.className = "chat-title";
+        group.id = "group";
+        group.innerText = user_group;
+        groupsEl.appendChild(group);
+    });
+    const logoutBtn = document.getElementById("logout");
+    logoutBtn.addEventListener("click", async () => {
+            try {
+                localStorage.clear()
+                window.location.href = "/";
+            }
+            catch (e) {
+                alert("Ошибка при выходе");
+            }
+        }
+        );
+</script>
+</body>
