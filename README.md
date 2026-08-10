@@ -1,2 +1,1 @@
-# 4at20
-lite portfolio project
+Мессенджер на go
